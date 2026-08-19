@@ -25,6 +25,13 @@ export type Buraco = {
   foto?: string | null;
 };
 
+export type Midia = {
+  id: number;
+  buraco_id: number;
+  uri: string;
+  tipo: string;
+};
+
 export function criarBuraco(
   usuarioId: number,
   titulo: string,
@@ -148,14 +155,11 @@ export function buscarBuraco(id: number) {
 }
 
 export function listarMidias(buracoId: number) {
-  return db.getAllSync<{
-    id: number;
-    uri: string;
-    tipo: string;
-  }>(
+  return db.getAllSync<Midia>(
     `
         SELECT
             id,
+            buraco_id,
             uri,
             tipo
         FROM midias

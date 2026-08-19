@@ -2,7 +2,6 @@ import {
   Alert,
   Image,
   ScrollView,
-  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
@@ -16,7 +15,6 @@ import * as Location from "expo-location";
 
 import MapView, {
   Marker,
-  Region,
 } from "react-native-maps";
 
 import {
@@ -25,11 +23,11 @@ import {
 } from "@/database/buracoRepository";
 
 import { colors } from "@/theme/colors";
+import { styles } from "./styles";
 
 export default function CadastroBuraco({
   navigation,
 }: any) {
-
   const [titulo, setTitulo] = useState("");
   const [descricao, setDescricao] = useState("");
 
@@ -43,8 +41,8 @@ export default function CadastroBuraco({
   const [gravidade, setGravidade] =
     useState("Média");
 
-  const [foto, setFoto] =
-    useState<string | null>(null);
+  const [fotos, setFotos] =
+    useState<string[]>([]);
 
   const [latitude, setLatitude] =
     useState<number | null>(null);
@@ -55,14 +53,16 @@ export default function CadastroBuraco({
   const [carregandoLocalizacao, setCarregandoLocalizacao] =
     useState(true);
 
+  const [salvando, setSalvando] =
+    useState(false);
+
   useEffect(() => {
     obterLocalizacao();
   }, []);
 
+  // LOCALIZAÇÃO
   async function obterLocalizacao() {
-
     try {
-
       setCarregandoLocalizacao(true);
 
       const {
@@ -71,14 +71,12 @@ export default function CadastroBuraco({
         await Location.requestForegroundPermissionsAsync();
 
       if (status !== "granted") {
-
         Alert.alert(
           "Permissão necessária",
           "Precisamos da sua localização para registrar o buraco."
         );
 
         setCarregandoLocalizacao(false);
-
         return;
       }
 
@@ -97,25 +95,26 @@ export default function CadastroBuraco({
       setLatitude(lat);
       setLongitude(lng);
 
-      const enderecoAtual =
+      // Tenta descobrir o endereço através das coordenadas GPS
+      const resultado =
         await Location.reverseGeocodeAsync({
           latitude: lat,
           longitude: lng,
         });
 
-      if (enderecoAtual.length > 0) {
+      if (resultado.length > 0) {
+        const local = resultado[0];
 
-        const local =
-          enderecoAtual[0];
+        const enderecoCompleto = [
+          local.street,
+          local.name,
+          local.streetNumber,
+        ]
+          .filter(Boolean)
+          .join(", ");
 
         setEndereco(
-          [
-            local.street,
-            local.name,
-            local.streetNumber,
-          ]
-            .filter(Boolean)
-            .join(", ")
+          enderecoCompleto
         );
 
         setBairro(
@@ -128,9 +127,7 @@ export default function CadastroBuraco({
           ""
         );
       }
-
     } catch (error) {
-
       console.log(
         "Erro ao obter localização:",
         error
@@ -140,80 +137,110 @@ export default function CadastroBuraco({
         "Erro",
         "Não foi possível obter sua localização."
       );
-
     } finally {
-
       setCarregandoLocalizacao(false);
-
     }
   }
 
+  // CÂMERA
   async function tirarFoto() {
+    try {
+      const {
+        status,
+      } =
+        await ImagePicker.requestCameraPermissionsAsync();
 
-    const {
-      status,
-    } =
-      await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permissão necessária",
+          "Precisamos de acesso à câmera."
+        );
 
-    if (status !== "granted") {
+        return;
+      }
 
-      Alert.alert(
-        "Permissão necessária",
-        "Precisamos de acesso à câmera."
+      const resultado =
+        await ImagePicker.launchCameraAsync({
+          mediaTypes:
+            ImagePicker.MediaTypeOptions.Images,
+          quality: 0.8,
+        });
+
+      if (!resultado.canceled) {
+        const uri =
+          resultado.assets[0].uri;
+
+        setFotos((anteriores) => [
+          ...anteriores,
+          uri,
+        ]);
+      }
+    } catch (error) {
+      console.log(
+        "Erro ao abrir câmera:",
+        error
       );
 
-      return;
-    }
-
-    const resultado =
-      await ImagePicker.launchCameraAsync({
-        mediaTypes:
-          ImagePicker.MediaTypeOptions.Images,
-        quality: 0.8,
-      });
-
-    if (!resultado.canceled) {
-
-      setFoto(
-        resultado.assets[0].uri
+      Alert.alert(
+        "Erro",
+        "Não foi possível abrir a câmera."
       );
     }
   }
 
+  // GALERIA
   async function escolherGaleria() {
+    try {
+      const {
+        status,
+      } =
+        await ImagePicker.requestMediaLibraryPermissionsAsync();
 
-    const {
-      status,
-    } =
-      await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert(
+          "Permissão necessária",
+          "Precisamos de acesso à sua galeria."
+        );
 
-    if (status !== "granted") {
+        return;
+      }
 
-      Alert.alert(
-        "Permissão necessária",
-        "Precisamos de acesso à sua galeria."
+      const resultado =
+        await ImagePicker.launchImageLibraryAsync({
+          mediaTypes:
+            ImagePicker.MediaTypeOptions.Images,
+
+          allowsMultipleSelection: true,
+
+          quality: 0.8,
+        });
+
+      if (!resultado.canceled) {
+        const novasFotos =
+          resultado.assets.map(
+            (asset) => asset.uri
+          );
+
+        setFotos((anteriores) => [
+          ...anteriores,
+          ...novasFotos,
+        ]);
+      }
+    } catch (error) {
+      console.log(
+        "Erro ao abrir galeria:",
+        error
       );
 
-      return;
-    }
-
-    const resultado =
-      await ImagePicker.launchImageLibraryAsync({
-        mediaTypes:
-          ImagePicker.MediaTypeOptions.Images,
-        quality: 0.8,
-      });
-
-    if (!resultado.canceled) {
-
-      setFoto(
-        resultado.assets[0].uri
+      Alert.alert(
+        "Erro",
+        "Não foi possível abrir a galeria."
       );
     }
   }
 
-  async function selecionarFoto() {
-
+  // ESCOLHER COMO ADICIONAR FOTO
+  function selecionarFoto() {
     Alert.alert(
       "Adicionar foto",
       "Escolha uma opção",
@@ -234,13 +261,30 @@ export default function CadastroBuraco({
     );
   }
 
+  // REMOVER FOTO
+  function removerFoto(index: number) {
+    setFotos((anteriores) =>
+      anteriores.filter(
+        (_, i) => i !== index
+      )
+    );
+  }
+
+  // CADASTRAR
   function cadastrar() {
-
     if (!titulo.trim()) {
-
       Alert.alert(
         "Atenção",
         "Informe um título para o problema."
+      );
+
+      return;
+    }
+
+    if (!descricao.trim()) {
+      Alert.alert(
+        "Atenção",
+        "Informe uma descrição do problema."
       );
 
       return;
@@ -250,7 +294,6 @@ export default function CadastroBuraco({
       latitude === null ||
       longitude === null
     ) {
-
       Alert.alert(
         "Atenção",
         "A localização ainda não foi encontrada."
@@ -259,38 +302,40 @@ export default function CadastroBuraco({
       return;
     }
 
-    try {
+    if (fotos.length === 0) {
+      Alert.alert(
+        "Atenção",
+        "Adicione pelo menos uma foto do buraco."
+      );
 
-      /*
-       * POR ENQUANTO:
-       * vamos usar usuário 1.
-       *
-       * Depois vamos pegar o ID
-       * do usuário realmente logado.
-       */
+      return;
+    }
+
+    try {
+      setSalvando(true);
 
       const buracoId =
         criarBuraco(
           1,
-          titulo,
-          descricao,
-          endereco,
-          bairro,
-          cidade,
+          titulo.trim(),
+          descricao.trim(),
+          endereco.trim(),
+          bairro.trim(),
+          cidade.trim(),
           latitude,
           longitude,
           categoria,
           gravidade
         );
 
-      if (foto) {
-
+      // Salva todas as fotos
+      fotos.forEach((uri) => {
         adicionarMidia(
           Number(buracoId),
-          foto,
+          uri,
           "imagem"
         );
-      }
+      });
 
       Alert.alert(
         "Buraco registrado!",
@@ -298,33 +343,26 @@ export default function CadastroBuraco({
         [
           {
             text: "OK",
-            onPress: () =>
-              navigation.goBack(),
+            onPress: () => {
+              navigation.goBack();
+            },
           },
         ]
       );
-
     } catch (error) {
-
-      console.log(error);
+      console.log(
+        "Erro ao cadastrar buraco:",
+        error
+      );
 
       Alert.alert(
         "Erro",
         "Não foi possível cadastrar o buraco."
       );
+    } finally {
+      setSalvando(false);
     }
   }
-
-  const region: Region | undefined =
-    latitude !== null &&
-      longitude !== null
-      ? {
-        latitude,
-        longitude,
-        latitudeDelta: 0.005,
-        longitudeDelta: 0.005,
-      }
-      : undefined;
 
   return (
     <ScrollView
@@ -338,8 +376,8 @@ export default function CadastroBuraco({
       {/* HEADER */}
 
       <View style={styles.header}>
-
         <TouchableOpacity
+          style={styles.backButton}
           onPress={() =>
             navigation.goBack()
           }
@@ -354,70 +392,108 @@ export default function CadastroBuraco({
         </Text>
 
         <View style={styles.headerSpace} />
-
       </View>
 
-      {/* FOTO */}
+      {/* FOTOS */}
+      <View style={styles.sectionHeader}>
+        <Text style={styles.sectionTitle}>
+          Fotos do problema
+        </Text>
 
-      <Text style={styles.sectionTitle}>
-        Foto do problema
-      </Text>
+        <Text style={styles.photoCount}>
+          {fotos.length}
+        </Text>
+      </View>
 
       <TouchableOpacity
-        style={styles.photoArea}
+        style={styles.addPhotoButton}
         onPress={selecionarFoto}
       >
+        <Text style={styles.cameraIcon}>
+          📷
+        </Text>
 
-        {foto ? (
+        <View>
+          <Text style={styles.addPhotoTitle}>
+            Adicionar foto
+          </Text>
 
-          <Image
-            source={{
-              uri: foto,
-            }}
-            style={styles.photo}
-          />
-
-        ) : (
-
-          <View
+          <Text
             style={
-              styles.photoPlaceholder
+              styles.addPhotoSubtitle
             }
           >
-
-            <Text
-              style={
-                styles.cameraIcon
-              }
-            >
-              📷
-            </Text>
-
-            <Text
-              style={
-                styles.photoTitle
-              }
-            >
-              Adicionar foto
-            </Text>
-
-            <Text
-              style={
-                styles.photoSubtitle
-              }
-            >
-              Tire uma foto ou escolha
-              da galeria
-            </Text>
-
-          </View>
-
-        )}
-
+            Câmera ou galeria
+          </Text>
+        </View>
       </TouchableOpacity>
 
-      {/* TÍTULO */}
+      {/* FOTOS ADICIONADAS */}
 
+      {fotos.length > 0 && (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={
+            false
+          }
+          style={styles.photosList}
+        >
+          {fotos.map(
+            (uri, index) => (
+              <View
+                key={`${uri}-${index}`}
+                style={
+                  styles.photoItem
+                }
+              >
+                <Image
+                  source={{
+                    uri,
+                  }}
+                  style={
+                    styles.photoPreview
+                  }
+                />
+
+                <TouchableOpacity
+                  style={
+                    styles.removePhoto
+                  }
+                  onPress={() =>
+                    removerFoto(
+                      index
+                    )
+                  }
+                >
+                  <Text
+                    style={
+                      styles.removePhotoText
+                    }
+                  >
+                    ×
+                  </Text>
+                </TouchableOpacity>
+
+                <View
+                  style={
+                    styles.photoNumber
+                  }
+                >
+                  <Text
+                    style={
+                      styles.photoNumberText
+                    }
+                  >
+                    {index + 1}
+                  </Text>
+                </View>
+              </View>
+            )
+          )}
+        </ScrollView>
+      )}
+
+      {/* INFORMAÇÕES */}
       <Text style={styles.sectionTitle}>
         Informações
       </Text>
@@ -456,19 +532,16 @@ export default function CadastroBuraco({
       />
 
       {/* CATEGORIA */}
-
       <Text style={styles.label}>
         Categoria
       </Text>
 
       <View style={styles.optionsRow}>
-
         {[
           "Rua",
           "Calçada",
           "Estrada",
         ].map((item) => (
-
           <TouchableOpacity
             key={item}
             style={[
@@ -490,25 +563,21 @@ export default function CadastroBuraco({
               {item}
             </Text>
           </TouchableOpacity>
-
         ))}
-
       </View>
 
-      {/* GRAVIDADE */}
 
+      {/* GRAVIDADE */}
       <Text style={styles.label}>
         Gravidade
       </Text>
 
       <View style={styles.optionsRow}>
-
         {[
           "Baixa",
           "Média",
           "Alta",
         ].map((item) => (
-
           <TouchableOpacity
             key={item}
             style={[
@@ -530,45 +599,15 @@ export default function CadastroBuraco({
               {item}
             </Text>
           </TouchableOpacity>
-
         ))}
-
       </View>
 
+
       {/* LOCALIZAÇÃO */}
-
-      <Text style={styles.sectionTitle}>
-        Localização
-      </Text>
-
-      <View style={styles.locationHeader}>
-
-        <Text style={styles.locationIcon}>
-          📍
+      <View style={styles.locationTitleRow}>
+        <Text style={styles.sectionTitle}>
+          Localização
         </Text>
-
-        <View style={styles.locationInfo}>
-
-          <Text
-            style={
-              styles.locationTitle
-            }
-          >
-            Sua localização
-          </Text>
-
-          <Text
-            style={
-              styles.locationText
-            }
-          >
-            {carregandoLocalizacao
-              ? "Obtendo localização..."
-              : endereco ||
-              "Localização encontrada"}
-          </Text>
-
-        </View>
 
         <TouchableOpacity
           onPress={obterLocalizacao}
@@ -581,20 +620,50 @@ export default function CadastroBuraco({
             Atualizar
           </Text>
         </TouchableOpacity>
+      </View>
 
+      <View style={styles.locationCard}>
+        <Text style={styles.locationIcon}>
+          📍
+        </Text>
+
+        <View
+          style={styles.locationInfo}
+        >
+          <Text
+            style={
+              styles.locationTitle
+            }
+          >
+            Localização atual
+          </Text>
+
+          <Text
+            style={
+              styles.locationText
+            }
+          >
+            {carregandoLocalizacao
+              ? "Obtendo localização..."
+              : endereco ||
+              "Localização encontrada"}
+          </Text>
+        </View>
       </View>
 
       {/* MAPA */}
-
       <View style={styles.mapContainer}>
-
-        {region ? (
-
+        {latitude !== null &&
+          longitude !== null ? (
           <MapView
             style={styles.map}
-            region={region}
+            region={{
+              latitude,
+              longitude,
+              latitudeDelta: 0.005,
+              longitudeDelta: 0.005,
+            }}
           >
-
             <Marker
               coordinate={{
                 latitude,
@@ -605,27 +674,26 @@ export default function CadastroBuraco({
                 endereco
               }
             />
-
           </MapView>
-
         ) : (
-
           <View
             style={
               styles.mapLoading
             }
           >
-            <Text>
-              Carregando mapa...
+            <Text
+              style={
+                styles.mapLoadingText
+              }
+            >
+              📍 Obtendo localização...
             </Text>
           </View>
-
         )}
-
       </View>
 
-      {/* ENDEREÇO */}
 
+      {/* ENDEREÇO */}
       <Text style={styles.label}>
         Endereço
       </Text>
@@ -668,227 +736,23 @@ export default function CadastroBuraco({
         onChangeText={setCidade}
       />
 
-      {/* BOTÃO */}
 
+      {/* BOTÃO CADASTRAR */}
       <TouchableOpacity
-        style={styles.button}
+        style={[
+          styles.button,
+          salvando &&
+          styles.buttonDisabled,
+        ]}
         onPress={cadastrar}
+        disabled={salvando}
       >
-
         <Text style={styles.buttonText}>
-          Cadastrar buraco
+          {salvando
+            ? "Cadastrando..."
+            : "Cadastrar buraco"}
         </Text>
-
       </TouchableOpacity>
-
     </ScrollView>
   );
 }
-
-const styles = StyleSheet.create({
-
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-
-  content: {
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-  },
-
-  header: {
-    height: 90,
-    paddingTop: 35,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-  },
-
-  back: {
-    fontSize: 36,
-    color: colors.text,
-  },
-
-  headerTitle: {
-    fontSize: 18,
-    fontWeight: "700",
-    color: colors.text,
-  },
-
-  headerSpace: {
-    width: 25,
-  },
-
-  sectionTitle: {
-    fontSize: 19,
-    fontWeight: "800",
-    color: colors.text,
-    marginTop: 20,
-    marginBottom: 15,
-  },
-
-  photoArea: {
-    height: 220,
-    borderRadius: 16,
-    overflow: "hidden",
-    backgroundColor: colors.gray,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-
-  photoPlaceholder: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  cameraIcon: {
-    fontSize: 45,
-    marginBottom: 10,
-  },
-
-  photoTitle: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: colors.text,
-  },
-
-  photoSubtitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    marginTop: 5,
-  },
-
-  photo: {
-    width: "100%",
-    height: "100%",
-  },
-
-  label: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: colors.text,
-    marginBottom: 7,
-    marginTop: 15,
-  },
-
-  input: {
-    height: 52,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    backgroundColor: colors.white,
-    paddingHorizontal: 15,
-    fontSize: 15,
-    color: colors.text,
-  },
-
-  textArea: {
-    height: 100,
-    paddingTop: 15,
-  },
-
-  optionsRow: {
-    flexDirection: "row",
-    gap: 10,
-  },
-
-  option: {
-    flex: 1,
-    height: 44,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: 10,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: colors.white,
-  },
-
-  optionActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-
-  optionText: {
-    color: colors.textSecondary,
-    fontWeight: "600",
-    fontSize: 13,
-  },
-
-  optionTextActive: {
-    color: colors.black,
-    fontWeight: "700",
-  },
-
-  locationHeader: {
-    backgroundColor: colors.white,
-    borderRadius: 12,
-    padding: 14,
-    flexDirection: "row",
-    alignItems: "center",
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-
-  locationIcon: {
-    fontSize: 25,
-    marginRight: 10,
-  },
-
-  locationInfo: {
-    flex: 1,
-  },
-
-  locationTitle: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: colors.text,
-  },
-
-  locationText: {
-    fontSize: 12,
-    color: colors.textSecondary,
-    marginTop: 3,
-  },
-
-  refreshText: {
-    color: colors.primaryDark,
-    fontSize: 12,
-    fontWeight: "700",
-  },
-
-  mapContainer: {
-    height: 220,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginTop: 15,
-  },
-
-  map: {
-    flex: 1,
-  },
-
-  mapLoading: {
-    flex: 1,
-    backgroundColor: colors.gray,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-
-  button: {
-    height: 56,
-    backgroundColor: colors.primary,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginTop: 30,
-  },
-
-  buttonText: {
-    color: colors.black,
-    fontSize: 16,
-    fontWeight: "800",
-  },
-
-});

@@ -50,5 +50,18 @@ export function initDatabase() {
       FOREIGN KEY (buraco_id)
         REFERENCES buracos(id)
     );
+
+    INSERT OR IGNORE INTO usuarios (
+      id,
+      nome,
+      email,
+      senha
+    )
+    VALUES (
+      1,
+      'Usuário Teste',
+      'teste@teste.com',
+      '123456'
+    );
   `);
 }

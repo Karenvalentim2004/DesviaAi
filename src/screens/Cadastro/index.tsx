@@ -3,7 +3,6 @@ import {
     KeyboardAvoidingView,
     Platform,
     ScrollView,
-    StyleSheet,
     Text,
     TextInput,
     TouchableOpacity,
@@ -12,21 +11,34 @@ import {
 
 import { useState } from "react";
 
-import { criarUsuario } from "@/database/usuarioRepository";
+import {
+    criarUsuario,
+    buscarUsuarioPorEmail,
+} from "@/database/usuarioRepository";
+
 import { colors } from "@/theme/colors";
+import { styles } from "./styles";
 
 export default function Cadastro({ navigation }: any) {
+
     const [nome, setNome] = useState("");
     const [email, setEmail] = useState("");
     const [senha, setSenha] = useState("");
     const [confirmarSenha, setConfirmarSenha] = useState("");
 
     function cadastrar() {
-        if (!nome || !email || !senha || !confirmarSenha) {
+
+        if (
+            !nome.trim() ||
+            !email.trim() ||
+            !senha ||
+            !confirmarSenha
+        ) {
             Alert.alert(
                 "Atenção",
                 "Preencha todos os campos."
             );
+
             return;
         }
 
@@ -35,13 +47,41 @@ export default function Cadastro({ navigation }: any) {
                 "Atenção",
                 "As senhas não são iguais."
             );
+
+            return;
+        }
+
+        if (senha.length < 6) {
+            Alert.alert(
+                "Atenção",
+                "A senha deve ter pelo menos 6 caracteres."
+            );
+
+            return;
+        }
+
+        const emailFormatado =
+            email.trim().toLowerCase();
+
+        const usuarioExistente =
+            buscarUsuarioPorEmail(
+                emailFormatado
+            );
+
+        if (usuarioExistente) {
+            Alert.alert(
+                "Atenção",
+                "Este e-mail já está cadastrado."
+            );
+
             return;
         }
 
         try {
+
             criarUsuario(
-                nome,
-                email,
+                nome.trim(),
+                emailFormatado,
                 senha
             );
 
@@ -52,14 +92,29 @@ export default function Cadastro({ navigation }: any) {
                     {
                         text: "Entrar",
                         onPress: () =>
-                            navigation.navigate("Login"),
+                            navigation.navigate(
+                                "Login"
+                            ),
                     },
                 ]
             );
+
+            // Limpa os campos
+            setNome("");
+            setEmail("");
+            setSenha("");
+            setConfirmarSenha("");
+
         } catch (error) {
+
+            console.log(
+                "Erro ao cadastrar usuário:",
+                error
+            );
+
             Alert.alert(
                 "Erro",
-                "Este e-mail já pode estar cadastrado."
+                "Não foi possível realizar o cadastro."
             );
         }
     }
@@ -73,10 +128,16 @@ export default function Cadastro({ navigation }: any) {
                     : undefined
             }
         >
+
             <ScrollView
-                contentContainerStyle={styles.content}
+                contentContainerStyle={
+                    styles.content
+                }
                 keyboardShouldPersistTaps="handled"
             >
+
+                {/* VOLTAR */}
+
                 <TouchableOpacity
                     onPress={() =>
                         navigation.goBack()
@@ -87,7 +148,10 @@ export default function Cadastro({ navigation }: any) {
                     </Text>
                 </TouchableOpacity>
 
+                {/* HEADER */}
+
                 <View style={styles.header}>
+
                     <Text style={styles.title}>
                         Criar conta
                     </Text>
@@ -96,9 +160,13 @@ export default function Cadastro({ navigation }: any) {
                         Cadastre-se para ajudar a registrar
                         os problemas da cidade.
                     </Text>
+
                 </View>
 
+                {/* FORMULÁRIO */}
+
                 <View style={styles.form}>
+
                     <Text style={styles.label}>
                         Nome
                     </Text>
@@ -111,6 +179,7 @@ export default function Cadastro({ navigation }: any) {
                         }
                         value={nome}
                         onChangeText={setNome}
+                        autoCapitalize="words"
                     />
 
                     <Text style={styles.label}>
@@ -125,6 +194,7 @@ export default function Cadastro({ navigation }: any) {
                         }
                         keyboardType="email-address"
                         autoCapitalize="none"
+                        autoCorrect={false}
                         value={email}
                         onChangeText={setEmail}
                     />
@@ -156,8 +226,12 @@ export default function Cadastro({ navigation }: any) {
                         }
                         secureTextEntry
                         value={confirmarSenha}
-                        onChangeText={setConfirmarSenha}
+                        onChangeText={
+                            setConfirmarSenha
+                        }
                     />
+
+                    {/* BOTÃO */}
 
                     <TouchableOpacity
                         style={styles.button}
@@ -167,115 +241,33 @@ export default function Cadastro({ navigation }: any) {
                             Cadastrar
                         </Text>
                     </TouchableOpacity>
+
                 </View>
 
+                {/* LOGIN */}
+
                 <View style={styles.loginArea}>
+
                     <Text style={styles.loginText}>
                         Já possui uma conta?
                     </Text>
 
                     <TouchableOpacity
                         onPress={() =>
-                            navigation.navigate("Login")
+                            navigation.navigate(
+                                "Login"
+                            )
                         }
                     >
                         <Text style={styles.loginLink}>
                             Entrar
                         </Text>
                     </TouchableOpacity>
+
                 </View>
+
             </ScrollView>
+
         </KeyboardAvoidingView>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: colors.white,
-    },
-
-    content: {
-        flexGrow: 1,
-        padding: 24,
-        paddingTop: 60,
-    },
-
-    voltar: {
-        fontSize: 16,
-        color: colors.text,
-        marginBottom: 40,
-    },
-
-    header: {
-        marginBottom: 35,
-    },
-
-    title: {
-        fontSize: 32,
-        fontWeight: "700",
-        color: colors.text,
-        marginBottom: 8,
-    },
-
-    subtitle: {
-        fontSize: 15,
-        color: colors.textSecondary,
-        lineHeight: 22,
-    },
-
-    form: {
-        gap: 8,
-    },
-
-    label: {
-        fontSize: 14,
-        fontWeight: "600",
-        color: colors.text,
-        marginTop: 8,
-    },
-
-    input: {
-        height: 52,
-        borderWidth: 1,
-        borderColor: colors.border,
-        borderRadius: 10,
-        paddingHorizontal: 16,
-        fontSize: 16,
-        color: colors.text,
-        backgroundColor: colors.white,
-    },
-
-    button: {
-        height: 54,
-        backgroundColor: colors.primary,
-        borderRadius: 10,
-        alignItems: "center",
-        justifyContent: "center",
-        marginTop: 24,
-    },
-
-    buttonText: {
-        fontSize: 16,
-        fontWeight: "700",
-        color: colors.black,
-    },
-
-    loginArea: {
-        flexDirection: "row",
-        justifyContent: "center",
-        marginTop: 30,
-        gap: 5,
-    },
-
-    loginText: {
-        color: colors.textSecondary,
-        fontSize: 14,
-    },
-
-    loginLink: {
-        color: colors.text,
-        fontWeight: "700",
-        fontSize: 14,
-    },
-});
